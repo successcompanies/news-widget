@@ -1,28 +1,28 @@
-export default async function handler(request, response) {
+module.exports = async function handler(req, res) {
   // Set CORS headers
-  response.setHeader('Access-Control-Allow-Origin', '*');
-  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   // Handle preflight request
-  if (request.method === 'OPTIONS') {
-    return response.status(200).end();
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
 
-  if (request.method !== 'POST') {
-    return response.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { query } = request.body;
+  const { query } = req.body;
 
   if (!query) {
-    return response.status(400).json({ error: 'Query is required' });
+    return res.status(400).json({ error: 'Query is required' });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    return response.status(500).json({ error: 'API key not configured on server' });
+    return res.status(500).json({ error: 'API key not configured on server' });
   }
 
   try {
@@ -42,7 +42,7 @@ export default async function handler(request, response) {
         }],
         messages: [{
           role: 'user',
-          content: `Search for all recent web mentions about "${query}". Find 8-12 results including news articles, social media posts, blog posts, press releases, company announcements, LinkedIn posts, tweets, Facebook posts, YouTube videos, podcast mentions, and any other online mentions. Return ONLY a JSON array with objects containing: title, source (like "Richmond Times-Dispatch" or "LinkedIn" or "Twitter/X" or "Company Blog"), date (formatted like "January 15, 2024"), url, summary (2 sentences max describing the mention). No markdown, no explanation, just the JSON array.`
+          content: 'Search for all recent web mentions about "' + query + '". Find 8-12 results including news articles, social media posts, blog posts, press releases, company announcements, LinkedIn posts, tweets, Facebook posts, YouTube videos, podcast mentions, and any other online mentions. Return ONLY a JSON array with objects containing: title, source (like "Richmond Times-Dispatch" or "LinkedIn" or "Twitter/X" or "Company Blog"), date (formatted like "January 15, 2024"), url, summary (2 sentences max describing the mention). No markdown, no explanation, just the JSON array.'
         }]
       })
     });
@@ -51,29 +51,29 @@ export default async function handler(request, response) {
 
     if (!anthropicResponse.ok) {
       console.error('Anthropic API error:', data);
-      return response.status(anthropicResponse.status).json({ 
+      return res.status(anthropicResponse.status).json({ 
         error: data.error?.message || 'API request failed',
         details: data
       });
     }
 
     let text = '';
-    for (const block of data.content || []) {
-      if (block.type === 'text') {
-        text += block.text;
+    for (let i = 0; i < (data.content || []).length; i++) {
+      if (data.content[i].type === 'text') {
+        text += data.content[i].text;
       }
     }
 
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const articles = JSON.parse(jsonMatch[0]);
-      return response.status(200).json({ articles });
+      return res.status(200).json({ articles: articles });
     } else {
-      return response.status(200).json({ articles: [], message: 'No results found' });
+      return res.status(200).json({ articles: [], message: 'No results found' });
     }
 
   } catch (error) {
     console.error('Search error:', error);
-    return response.status(500).json({ error: 'Search failed: ' + error.message });
+    return res.status(500).json({ error: 'Search failed: ' + error.message });
   }
-}
+};
